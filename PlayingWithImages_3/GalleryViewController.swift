@@ -91,7 +91,7 @@ class GalleryViewController: UIViewController, UICollectionViewDelegate, UIColle
 //                    if (filteredImages.filter({$0.description}) is String){
                     
                     
-                        self.imgurImages = filteredImages.filter({$0.description != nil})
+                        self.imgurImages = filteredImages.filter({return $0.description != nil})
                     
 //                    }
                     
