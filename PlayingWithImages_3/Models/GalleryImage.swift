@@ -12,11 +12,11 @@ struct GalleryImage: Codable {
     
     let link: String
     let isAlbum: Bool
-    let description: String //add this again and try
+    let description: String?
     
     private enum CodingKeys : String, CodingKey {
         case isAlbum = "is_album"
         case link = "link"
-        case description = "description" //add this again and try
+        case description = "description"
     }
 }

@@ -26,10 +26,7 @@ class GalleryViewController: UIViewController, UICollectionViewDelegate, UIColle
 //            "/Users/mblb/Desktop/mobilab/mobilabGitRepo/PlayingWithImages_3/PlayingWithImages_3/Assets.xcassets/img3.imageset/img3.png",
 //            ]
     
-    var imgurImages: [String] = []
-    
-            
-    
+    var imgurImages: [GalleryImage] = []
     
     
     override func viewDidLoad() {
@@ -38,66 +35,71 @@ class GalleryViewController: UIViewController, UICollectionViewDelegate, UIColle
         collectionView.delegate = self
         
         loadImages()
-        
     }
     
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int{
-//        return flowersLabels.count
         return imgurImages.count
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell{
         let myCell: MyCollectionViewCell = collectionView.dequeueReusableCell(withReuseIdentifier: "myCell", for: indexPath) as! MyCollectionViewCell
-        let imageSring = self.imgurImages[indexPath.row]
-        myCell.myImageView.imageFromServerURL(imageSring, placeHolder: nil)
-//        myCell.myImageLabel
+        let imageModel = self.imgurImages[indexPath.row]
+        myCell.myImageView.imageFromServerURL(imageModel.link, placeHolder: nil)
+        myCell.myImageLabel.text = imageModel.description
         
         return myCell
     }
     
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath){
-        print("user tapped on # \(indexPath.row)")
-        let myImageViewPage: MyImageViewController = self.storyboard?.instantiateViewController(withIdentifier: "MyImageViewController") as! MyImageViewController
+
+        let imageModel = self.imgurImages[indexPath.row]
         
-        myImageViewPage.selectedImage = self.imgurImages[indexPath.row]
-    self.navigationController?.pushViewController(myImageViewPage, animated: true)
+        let myImageViewPage: MyImageViewController = self.storyboard?.instantiateViewController(withIdentifier: "MyImageViewController") as! MyImageViewController
+        myImageViewPage.selectedImage = imageModel.link
+        
+        self.navigationController?.pushViewController(myImageViewPage, animated: true)
     }
     
-    func loadImages(){
-//        var albumList: AlbumListViewController?
-//        var query = albumList?.changeAlbum()
+    func loadImages() {
+
         guard let imageURL = URL(string: "https://api.imgur.com/3/gallery/hot/viral/\(albumNumber)") else{return}
         
         var request = URLRequest(url: imageURL)
         request.setValue("Client-ID 959fb0d50bacbdc", forHTTPHeaderField: "Authorization")
         let task = URLSession.shared.dataTask(with: request) { (data, response, error) in
             
-            if let data = data {
+            if let error = error {
+                print("Request error: \(error)")
+            }
+            
+            guard let responseData = data else {
+                print("Response data is missing or malformed")
+                return
+            }
+            
+            do {
+                // We are transforming received data to JSON just for printing nicely in console
+                if let jsonDictionary = try JSONSerialization.jsonObject(with: responseData) as? [String:Any] {
+                    print("Response in JSON: \(jsonDictionary)")
+                }
                 
-                if let jsonDictionary = try! JSONSerialization.jsonObject(with: data) as? [String:Any] {
-                print("dataString \(jsonDictionary)")
+                // We are transforming received data to model for displaying in table
+                let galleryImages = try JSONDecoder().decode(GalleryData.self, from: responseData)
+                self.imgurImages = galleryImages.data.filter({ !$0.isAlbum })
                 
-                let galleryImages = try! JSONDecoder().decode(GalleryData.self, from: data)
-                    
-                    let filteredImages = galleryImages.data.filter({ !$0.isAlbum })
-                    
-                self.imgurImages = filteredImages.flatMap({ $0.link })
-                    
-                    //I added recently for checking whether description is null or not
-
-
-//                    if (filteredImages.filter({$0.description}) is String){
-                    
-                    
-                        self.imgurImages = filteredImages.filter({return $0.description != nil})
-                    
-//                    }
-                    
-                    DispatchQueue.main.async {
-                        self.collectionView.reloadData()
-                    }
+                DispatchQueue.main.async {
+                    self.collectionView.reloadData()
+                }
+            } catch {
+                print("There was an error in serialization/decoding \(error)")
+                
+                // We are clearing the table so no cells are showed if there is an error
+                self.imgurImages = []
+                
+                DispatchQueue.main.async {
+                    self.collectionView.reloadData()
                 }
             }
         }
@@ -105,23 +107,23 @@ class GalleryViewController: UIViewController, UICollectionViewDelegate, UIColle
     }
 }
 
+
 let imageCache = NSCache<NSString, UIImage>()
 
 extension UIImageView {
     
     func imageFromServerURL(_ URLString: String, placeHolder: UIImage?) {
-        
+
         self.image = nil
         if let cachedImage = imageCache.object(forKey: NSString(string: URLString)) {
             self.image = cachedImage
             return
         }
-        
+
         if let url = URL(string: URLString) {
             URLSession.shared.dataTask(with: url, completionHandler: { (data, response, error) in
-                
-                //print("RESPONSE FROM API: \(response)")
-                if error != nil {
+
+                if let error = error {
                     print("ERROR LOADING IMAGES FROM URL: \(error)")
                     DispatchQueue.main.async {
                         self.image = placeHolder
